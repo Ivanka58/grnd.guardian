@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: grnd-monitor
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    healthCheckPath: /health
+    autoDeploy: true
+    disk:
+      name: grnd-data
+      mountPath: /opt/render/project/src/data
+      sizeGB: 1
