@@ -9,21 +9,17 @@ SITE_ROOT = "https://grnd.gg"
 ADMINS_URL = f"{SITE_ROOT}/admin/admins"
 COMPLAINTS_URL = f"{SITE_ROOT}/admin/complaints"
 
-
 class SiteError(Exception):
     pass
-
 
 class InvalidSession(SiteError):
     pass
 
-
 class SiteStructureError(SiteError):
     pass
 
-
 class GrndSession:
-    def init(self, cookies: str):
+    def __init__(self, cookies: str):
         self.cookies = cookies.strip()
         self.timeout = aiohttp.ClientTimeout(total=25)
         self.headers = {
@@ -42,14 +38,8 @@ class GrndSession:
 
     async def fetch(self, url: str) -> tuple[str, str]:
         try:
-            async with aiohttp.ClientSession(
-                headers=self.headers,
-                timeout=self.timeout,
-            ) as session:
-                async with session.get(
-                    url,
-                    allow_redirects=True,
-                ) as response:
+            async with aiohttp.ClientSession(headers=self.headers, timeout=self.timeout) as session:
+                async with session.get(url, allow_redirects=True) as response:
                     final_url = str(response.url)
                     html = await response.text(errors="replace")
 
@@ -67,7 +57,6 @@ class GrndSession:
                         raise InvalidSession("Сессия истекла или неверные куки (редирект на логин)")
 
                     return final_url, html
-
         except (InvalidSession, SiteError):
             raise
         except asyncio.TimeoutError as exc:
@@ -91,7 +80,6 @@ class GrndSession:
 
             for row in rows:
                 cells = row.find_all("td", recursive=False)
-
                 if len(cells) < 8:
                     continue
 
@@ -108,13 +96,10 @@ class GrndSession:
                 if not current_nickname or not match:
                     continue
 
-                entry = {
-                    "nickname": current_nickname,
-                    "lvl": int(match.group(1)),
-                }
-
+                entry = {"nickname": current_nickname, "lvl": int(match.group(1))}
                 candidates.append(entry)
-if nickname and current_nickname.casefold() == nickname.strip().casefold():
+
+                if nickname and current_nickname.casefold() == nickname.strip().casefold():
                     return entry
 
             if nickname:
@@ -145,14 +130,12 @@ if nickname and current_nickname.casefold() == nickname.strip().casefold():
             blocks = soup.select("div.admin-complaints-content")
 
             if not blocks:
-                raise SiteStructureError("Блоки жалоб не найдены на странице (возможно, пустая страница или защита)")
+                raise SiteStructureError("Блоки жалоб не найдены на странице")
 
             result = []
-
             for block in blocks:
                 try:
                     info = {}
-
                     for item in block.select("div.content-info > div.item"):
                         label_node = item.select_one("div.label")
                         title_node = item.select_one("div.title")
@@ -174,20 +157,11 @@ if nickname and current_nickname.casefold() == nickname.strip().casefold():
 
                     text_node = block.select_one("div.descriptions > div.flex > div > div.text")
                     evidence_nodes = block.select("div.resources > img[src]")
-
-                    evidence_urls = [
-                        image.get("src", "").strip()
-                        for image in evidence_nodes
-                        if image.get("src", "").strip()
-                    ]
-
-                    evidence_urls = [
-                        url for url in evidence_urls
-                        if urlparse(url).scheme in ("http", "https")
-                    ]
+                    
+                    evidence_urls = [image.get("src", "").strip() for image in evidence_nodes if image.get("src", "").strip()]
+                    evidence_urls = [url for url in evidence_urls if urlparse(url).scheme in ("http", "https")]
 
                     complaint_id = info.get("complaint_id", "")
-
                     if not complaint_id or not complaint_id.isdigit():
                         continue
 
@@ -201,19 +175,17 @@ if nickname and current_nickname.casefold() == nickname.strip().casefold():
                         "evidence_urls": evidence_urls,
                         "url": f"{COMPLAINTS_URL}/{complaint_id}",
                     })
-
                 except Exception:
                     continue
 
             return result
-
         except (InvalidSession, SiteError):
             raise
         except Exception as exc:
             raise SiteStructureError("Ошибка обработки списка жалоб") from exc
 
-
 async def check_session(cookies: str) -> dict:
     return await GrndSession(cookies).profile()
+
 async def fetch_complaints(cookies: str) -> list[dict]:
     return await GrndSession(cookies).complaints()
